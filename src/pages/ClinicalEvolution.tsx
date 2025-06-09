@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, User, Clock, Save, CheckSquare } from 'lucide-react';
+import { usePatients } from '../hooks/usePatients';
+import { useEvolutions } from '../hooks/useEvolutions';
 import PageHeader from '../components/PageHeader';
 import FormField from '../components/FormField';
 
 const ClinicalEvolution: React.FC = () => {
   const navigate = useNavigate();
+  const { patients } = usePatients();
+  const { createEvolution } = useEvolutions();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  
   const [formData, setFormData] = useState({
     patient: '',
     date: new Date().toISOString().split('T')[0],
@@ -55,11 +63,57 @@ const ClinicalEvolution: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Evolution data:', formData);
-    navigate('/');
+    setLoading(true);
+    setError(null);
+
+    try {
+      const evolutionData = {
+        patient_id: formData.patient,
+        evolution_date: formData.date,
+        evolution_time: formData.time,
+        clinical_description: formData.clinicalDescription,
+        procedures: formData.procedures,
+        observations: formData.observations,
+        wound_assessment: formData.woundAssessment,
+      };
+
+      const materials = formData.materials.filter(m => m.name.trim() !== '');
+
+      const { error } = await createEvolution(evolutionData, materials);
+      
+      if (error) {
+        throw new Error(error);
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/');
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar evolução');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (success) {
+    return (
+      <div className="p-4 pb-20">
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center max-w-md">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText size={32} className="text-emerald-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">Evolução Salva!</h2>
+            <p className="text-slate-600 mb-4">A evolução clínica foi registrada com sucesso.</p>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 pb-20">
@@ -89,9 +143,11 @@ const ClinicalEvolution: React.FC = () => {
                   required
                 >
                   <option value="">Selecione um paciente</option>
-                  <option value="maria-santos">Maria Santos (67 anos)</option>
-                  <option value="joao-silva">João Silva (45 anos)</option>
-                  <option value="ana-costa">Ana Costa (52 anos)</option>
+                  {patients.map((patient) => (
+                    <option key={patient.id} value={patient.id}>
+                      {patient.full_name} ({new Date().getFullYear() - new Date(patient.birth_date).getFullYear()} anos)
+                    </option>
+                  ))}
                 </select>
               </div>
               
@@ -243,6 +299,12 @@ const ClinicalEvolution: React.FC = () => {
             />
           </div>
 
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
+
           {/* Submit Buttons */}
           <div className="flex gap-4 pt-6">
             <button
@@ -254,9 +316,10 @@ const ClinicalEvolution: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 px-6 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+              disabled={loading}
+              className="flex-1 py-3 px-6 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
             >
-              Salvar Evolução
+              {loading ? 'Salvando...' : 'Salvar Evolução'}
             </button>
           </div>
         </form>

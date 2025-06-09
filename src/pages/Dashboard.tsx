@@ -13,12 +13,20 @@ import {
   TrendingUp,
   Users
 } from 'lucide-react';
+import { usePatients } from '../hooks/usePatients';
+import { useEvolutions } from '../hooks/useEvolutions';
+import { useWoundPhotos } from '../hooks/useWoundPhotos';
+import { useProfessional } from '../hooks/useProfessional';
 import ActionButton from '../components/ActionButton';
 import StatCard from '../components/StatCard';
 import RecentPatients from '../components/RecentPatients';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { patients } = usePatients();
+  const { evolutions } = useEvolutions();
+  const { photos } = useWoundPhotos();
+  const { professional } = useProfessional();
 
   const mainActions = [
     {
@@ -71,36 +79,57 @@ const Dashboard: React.FC = () => {
     }
   ];
 
+  // Calculate today's evolutions
+  const today = new Date().toISOString().split('T')[0];
+  const todayEvolutions = evolutions.filter(e => e.evolution_date === today).length;
+
+  // Calculate pending items (patients without recent evolutions)
+  const recentDate = new Date();
+  recentDate.setDate(recentDate.getDate() - 7);
+  const recentEvolutionPatients = evolutions
+    .filter(e => new Date(e.evolution_date) >= recentDate)
+    .map(e => e.patient_id);
+  const pendingPatients = patients.filter(p => !recentEvolutionPatients.includes(p.id)).length;
+
   const stats = [
     {
       icon: Users,
       label: 'Pacientes Ativos',
-      value: '127',
+      value: patients.length.toString(),
       change: '+12%',
       color: 'text-blue-600'
     },
     {
       icon: FileText,
       label: 'Evoluções Hoje',
-      value: '8',
+      value: todayEvolutions.toString(),
       change: '+25%',
       color: 'text-emerald-600'
     },
     {
-      icon: TrendingUp,
-      label: 'Taxa de Cicatrização',
-      value: '85%',
-      change: '+3%',
+      icon: Camera,
+      label: 'Fotos Registradas',
+      value: photos.length.toString(),
+      change: '+15%',
       color: 'text-purple-600'
     },
     {
       icon: Clock,
       label: 'Pendências',
-      value: '3',
+      value: pendingPatients.toString(),
       change: '-2',
       color: 'text-orange-600'
     }
   ];
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <div className="p-4 pb-20">
@@ -109,10 +138,14 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">ESTOMAPRO</h1>
-            <p className="text-slate-600">Bem-vindo de volta, Dr. Silva</p>
+            <p className="text-slate-600">
+              Bem-vindo de volta, {professional?.full_name || 'Profissional'}
+            </p>
           </div>
           <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-semibold text-lg">DS</span>
+            <span className="text-white font-semibold text-lg">
+              {professional ? getInitials(professional.full_name) : 'PR'}
+            </span>
           </div>
         </div>
         <div className="text-sm text-slate-500">

@@ -1,36 +1,80 @@
 import React from 'react';
 import { Clock, AlertCircle, Camera, FileText } from 'lucide-react';
+import { usePatients } from '../hooks/usePatients';
+import { useEvolutions } from '../hooks/useEvolutions';
+import { useWoundPhotos } from '../hooks/useWoundPhotos';
 
 const RecentPatients: React.FC = () => {
-  const patients = [
-    {
-      id: 1,
-      name: 'Maria Santos',
-      age: 67,
-      condition: 'Úlcera diabética',
-      lastVisit: '2 horas atrás',
-      status: 'evolution',
-      priority: 'high'
-    },
-    {
-      id: 2,
-      name: 'João Silva',
-      age: 45,
-      condition: 'Úlcera de pressão',
-      lastVisit: '1 dia atrás',
-      status: 'photo',
-      priority: 'medium'
-    },
-    {
-      id: 3,
-      name: 'Ana Costa',
-      age: 52,
-      condition: 'Ferida cirúrgica',
-      lastVisit: '3 dias atrás',
-      status: 'pending',
-      priority: 'low'
+  const { patients } = usePatients();
+  const { evolutions } = useEvolutions();
+  const { photos } = useWoundPhotos();
+
+  // Get recent patients with their latest activity
+  const recentPatients = patients.slice(0, 3).map(patient => {
+    const patientEvolutions = evolutions.filter(e => e.patient_id === patient.id);
+    const patientPhotos = photos.filter(p => p.patient_id === patient.id);
+    
+    const lastEvolution = patientEvolutions.sort((a, b) => 
+      new Date(b.evolution_date).getTime() - new Date(a.evolution_date).getTime()
+    )[0];
+    
+    const lastPhoto = patientPhotos.sort((a, b) => 
+      new Date(b.photo_date).getTime() - new Date(a.photo_date).getTime()
+    )[0];
+
+    let lastActivity = 'Sem atividade';
+    let status = 'pending';
+    let priority = 'low';
+
+    if (lastEvolution) {
+      const daysSinceEvolution = Math.floor(
+        (new Date().getTime() - new Date(lastEvolution.evolution_date).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      
+      if (daysSinceEvolution === 0) {
+        lastActivity = 'Hoje';
+        status = 'evolution';
+        priority = 'low';
+      } else if (daysSinceEvolution === 1) {
+        lastActivity = '1 dia atrás';
+        status = 'evolution';
+        priority = 'medium';
+      } else {
+        lastActivity = `${daysSinceEvolution} dias atrás`;
+        status = 'pending';
+        priority = daysSinceEvolution > 7 ? 'high' : 'medium';
+      }
     }
-  ];
+
+    if (lastPhoto && (!lastEvolution || new Date(lastPhoto.photo_date) > new Date(lastEvolution.evolution_date))) {
+      const daysSincePhoto = Math.floor(
+        (new Date().getTime() - new Date(lastPhoto.photo_date).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      
+      if (daysSincePhoto === 0) {
+        lastActivity = 'Foto hoje';
+        status = 'photo';
+      } else if (daysSincePhoto === 1) {
+        lastActivity = 'Foto 1 dia atrás';
+        status = 'photo';
+      } else {
+        lastActivity = `Foto ${daysSincePhoto} dias atrás`;
+        status = 'photo';
+      }
+    }
+
+    const age = new Date().getFullYear() - new Date(patient.birth_date).getFullYear();
+
+    return {
+      id: patient.id,
+      name: patient.full_name,
+      age,
+      condition: patient.main_diagnosis,
+      lastVisit: lastActivity,
+      status,
+      priority
+    };
+  });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -58,18 +102,35 @@ const RecentPatients: React.FC = () => {
     }
   };
 
+  if (patients.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
+        <div className="p-6 border-b border-slate-100">
+          <h2 className="text-xl font-semibold text-slate-800">Pacientes Recentes</h2>
+        </div>
+        <div className="p-8 text-center">
+          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FileText size={32} className="text-slate-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-800 mb-2">Nenhum paciente cadastrado</h3>
+          <p className="text-slate-600">Cadastre o primeiro paciente para começar</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
       <div className="p-6 border-b border-slate-100">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-slate-800">Pacientes Recentes</h2>
           <button className="text-blue-600 text-sm font-medium hover:text-blue-700">
-            Ver todos
+            Ver todos ({patients.length})
           </button>
         </div>
       </div>
       <div className="divide-y divide-slate-100">
-        {patients.map((patient) => (
+        {recentPatients.map((patient) => (
           <div
             key={patient.id}
             className={`p-4 hover:bg-slate-50 transition-colors duration-200 border-l-4 ${getPriorityColor(patient.priority)}`}

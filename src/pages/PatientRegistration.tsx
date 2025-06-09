@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
 import { ArrowLeft, User, Calendar, Phone, Mail, Heart, FileText, Camera, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { usePatients } from '../hooks/usePatients';
 import PageHeader from '../components/PageHeader';
 import FormField from '../components/FormField';
 
 const PatientRegistration: React.FC = () => {
   const navigate = useNavigate();
+  const { createPatient } = usePatients();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  
   const [formData, setFormData] = useState({
     fullName: '',
     birthDate: '',
     gender: '',
     phone: '',
     email: '',
-    comorbidities: [],
     mainDiagnosis: '',
     observations: '',
     responsibleName: '',
@@ -25,13 +30,59 @@ const PatientRegistration: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission here
-    console.log('Patient data:', formData);
-    // Show success message and navigate back
-    navigate('/');
+    setLoading(true);
+    setError(null);
+
+    try {
+      const patientData = {
+        full_name: formData.fullName,
+        birth_date: formData.birthDate,
+        gender: formData.gender as 'masculino' | 'feminino' | 'outro',
+        phone: formData.phone || undefined,
+        email: formData.email || undefined,
+        main_diagnosis: formData.mainDiagnosis,
+        observations: formData.observations,
+        responsible_name: formData.responsibleName || undefined,
+        responsible_phone: formData.responsiblePhone || undefined,
+        password_protected: formData.passwordProtected,
+        password_hash: formData.passwordProtected ? formData.password : undefined,
+      };
+
+      const { error } = await createPatient(patientData);
+      
+      if (error) {
+        throw new Error(error);
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/');
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao cadastrar paciente');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (success) {
+    return (
+      <div className="p-4 pb-20">
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center max-w-md">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <User size={32} className="text-emerald-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">Paciente Cadastrado!</h2>
+            <p className="text-slate-600 mb-4">O paciente foi cadastrado com sucesso no sistema.</p>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 pb-20">
@@ -70,7 +121,7 @@ const PatientRegistration: React.FC = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Sexo
+                    Sexo <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={formData.gender}
@@ -195,6 +246,12 @@ const PatientRegistration: React.FC = () => {
             </div>
           </div>
 
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
+
           {/* Submit Buttons */}
           <div className="flex gap-4 pt-6">
             <button
@@ -206,9 +263,10 @@ const PatientRegistration: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 px-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+              disabled={loading}
+              className="flex-1 py-3 px-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
             >
-              Salvar Paciente
+              {loading ? 'Salvando...' : 'Salvar Paciente'}
             </button>
           </div>
         </form>
